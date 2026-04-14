@@ -1,7 +1,4 @@
-import { Component, signal, computed } from '@angular/core';
-import { DUMMY_USERS } from '../dummy-users';
-
-const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
+import { Component, computed, Input, input, Output, EventEmitter } from '@angular/core';
 
 @Component({
   selector: 'app-user',
@@ -11,17 +8,30 @@ const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
   styleUrl: './user.component.css'
 })
 export class UserComponent {
-  selectedUser = signal(DUMMY_USERS[randomIndex]);
 
-  imagePath = computed(() => 'assets/users/' + this.selectedUser().avatar);
+  @Input ({required: true}) user! : { id: string; name: string; avatar: string };
+  // @Input({required: true}) id!: string;
+  // @Input({required: true}) avatar!: string;
+  // @Input({required: true}) name!: string;
 
-  // computed methode untuk mendapatkan path gambar berdasarkan avatar user yang dipilih
-  // get imagePath() {
-  //   return 'assets/users/' + this.selectedUser.avatar;
-  // }
+  // @Output() mendefinisikan event yang bisa didengar oleh parent component.
+  // EventEmitter<string> artinya event ini akan mengirim nilai bertipe string (yaitu id user).
+  // Nama property (selectUser) harus cocok dengan binding di template parent: (selectUser)="..."
+  @Output() selectUser = new EventEmitter<string>();
 
-  onSelectUser() {
-    const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
-    this.selectedUser.set(DUMMY_USERS[randomIndex]);
+  // avatar = input.required<string>();
+  // name = input.required<string>();
+
+  // imagePath = computed(() => `assets/users/${this.avatar()}`);
+
+  get imagePath() {
+    return `assets/users/${this.user.avatar}`;
+  }
+
+  // Method ini dipanggil saat tombol diklik (lihat template: (click)="handleClick()").
+  // .emit() mengirimkan nilai (this.id) ke parent melalui event selectUser.
+  // Nilai yang di-emit akan diterima parent sebagai $event di templatenya.
+  handleClick() {
+    this.selectUser.emit(this.user.id);
   }
 }

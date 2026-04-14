@@ -2,7 +2,31 @@
 <main>
   <ul id="users">
     <li>
-      <app-user></app-user>
+      <!-- (selectUser) mendengar event yang di-emit UserComponent. -->
+      <!-- $event berisi nilai yang dikirim via .emit(), yaitu id user. -->
+      <app-user
+        [user]="users[0]"
+        (selectUser)="onSelectUser($event)"
+      />
+    </li>
+    <li>
+      <app-user
+        [user]="users[1]"
+        (selectUser)="onSelectUser($event)"
+      />
+    </li>
+    <li>
+      <app-user
+        [user]="users[2]"
+        (selectUser)="onSelectUser($event)"
+      />
+    </li>
+    <li>
+      <app-user
+        [user]="users[3]"
+        (selectUser)="onSelectUser($event)"
+      />
     </li>
   </ul>
+  <app-tasks [name]="selectedUser?.name || ''" />
 </main>

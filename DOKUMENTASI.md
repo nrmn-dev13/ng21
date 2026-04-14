@@ -7,8 +7,9 @@
 3. [Konsep Angular yang Digunakan](#konsep-angular-yang-digunakan)
 4. [Penjelasan File per File](#penjelasan-file-per-file)
 5. [Alur Data (Data Flow)](#alur-data-data-flow)
-6. [Konsep Penting untuk Dipelajari](#konsep-penting-untuk-dipelajari)
-7. [Cara Menjalankan Project](#cara-menjalankan-project)
+6. [Komunikasi Antar Component](#komunikasi-antar-component)
+7. [Konsep Penting untuk Dipelajari](#konsep-penting-untuk-dipelajari)
+8. [Cara Menjalankan Project](#cara-menjalankan-project)
 
 ---
 
@@ -271,6 +272,108 @@ imagePath = computed(() => 'assets/users/' + this.selectedUser().avatar);
 
 ---
 
+### 9. Event Binding `( )`
+
+Event binding menghubungkan event DOM (seperti klik) ke method di class component.
+
+```html
+<!-- user.component.html -->
+<button (click)="handleClick()">
+```
+
+- `(click)` — nama event DOM yang didengarkan (dalam kurung)
+- `"handleClick()"` — method yang dipanggil saat event terjadi
+
+Event binding umum lainnya: `(input)`, `(change)`, `(submit)`, `(keyup)`, dsb.
+
+---
+
+### 10. `@Input()` — Menerima Data dari Parent
+
+`@Input()` memungkinkan parent component mengirim data ke child component melalui atribut di template.
+
+```typescript
+// user.component.ts
+@Input({ required: true }) id!: string;
+@Input({ required: true }) avatar!: string;
+@Input({ required: true }) name!: string;
+```
+
+- `required: true` — Angular akan error saat build jika parent tidak mengisi properti ini
+- `!` (non-null assertion) — memberitahu TypeScript bahwa nilai pasti akan ada saat runtime
+
+**Cara parent mengirim data (property binding):**
+```html
+<!-- app.component.html -->
+<app-user
+  [id]="users[0].id"
+  [avatar]="users[0].avatar"
+  [name]="users[0].name"
+/>
+```
+
+> **Aturan:** Nama dalam `[ ]` di template parent harus cocok persis dengan nama `@Input()` di class child.
+
+---
+
+### 11. `@Output()` + `EventEmitter` — Mengirim Event ke Parent
+
+`@Output()` memungkinkan child component mengirim event ke parent. Pasangannya adalah `EventEmitter`.
+
+```typescript
+// user.component.ts
+@Output() selectUser = new EventEmitter<string>();
+//         ^^^^^^^^^                     ^^^^^^
+//         nama event                    tipe nilai yang dikirim
+```
+
+**Cara mengirim (emit) nilai:**
+```typescript
+handleClick() {
+  this.selectUser.emit(this.id);  // kirim this.id ke parent
+}
+```
+
+**Cara parent mendengarkan:**
+```html
+<!-- app.component.html -->
+(selectUser)="onSelectUser($event)"
+// ^^^^^^^^^                ^^^^^^
+// nama @Output di child    nilai yang dikirim via .emit()
+```
+
+> **Aturan:** Nama dalam `( )` di template parent harus cocok persis dengan nama `@Output()` di class child.
+
+---
+
+### 12. `$event` — Nilai yang Dikirim Bersama Event
+
+`$event` adalah kata kunci khusus Angular di template yang berisi nilai dari event yang terjadi.
+
+Untuk event DOM biasa, `$event` berisi object event bawaan browser:
+```html
+<input (input)="onType($event)" />
+<!-- $event = InputEvent (object browser) -->
+```
+
+Untuk `@Output()` + `EventEmitter`, `$event` berisi nilai yang di-`.emit()`:
+```html
+(selectUser)="onSelectUser($event)"
+<!-- $event = nilai dari this.selectUser.emit(this.id) = string id user -->
+```
+
+**Alur `$event` secara lengkap:**
+```
+UserComponent:  this.selectUser.emit("u1")
+                                     ↓
+AppComponent:   (selectUser)="onSelectUser($event)"
+                                            ↓ $event = "u1"
+AppComponent:   onSelectUser(userId: string) { ... }
+                              userId = "u1"
+```
+
+---
+
 ### 6. Logika di Luar Class (Module-level)
 
 ```typescript
@@ -294,19 +397,29 @@ export class UserComponent {
 import { Component } from '@angular/core';
 import { HeaderComponent } from './header/header.component';
 import { UserComponent } from './user/user.component';
+import { DUMMY_USERS } from './dummy-users';
 
 @Component({
-  selector: 'app-root',           // dipakai di index.html sebagai <app-root>
+  selector: 'app-root',
   standalone: true,
   imports: [HeaderComponent, UserComponent],  // component anak wajib didaftarkan di sini
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
 })
-export class AppComponent {}      // class kosong — logic ada di child components
+export class AppComponent {
+  users = DUMMY_USERS;  // data user dikirim ke child via @Input()
+
+  // Dipanggil saat menerima event (selectUser) dari UserComponent.
+  // userId adalah nilai $event — string id yang di-emit oleh child.
+  onSelectUser(userId: string) {
+    console.log('Selected user ID:', userId);
+  }
+}
 ```
 
 **Yang perlu diperhatikan:**
-- `AppComponent` tidak punya logic sendiri — ia hanya menjadi "container"
+- `users` menyimpan data yang akan dikirim ke setiap `<app-user>` via `@Input()`
+- `onSelectUser()` adalah **event handler** — dipanggil ketika child emit event `selectUser`
 - Child components (`HeaderComponent`, `UserComponent`) **harus didaftarkan di `imports`** agar bisa dipakai di template
 
 ---
@@ -318,13 +431,21 @@ export class AppComponent {}      // class kosong — logic ada di child compone
 <main>
   <ul id="users">
     <li>
-      <app-user></app-user>
+      <app-user
+        [id]="users[0].id"
+        [avatar]="users[0].avatar"
+        [name]="users[0].name"
+        (selectUser)="onSelectUser($event)"
+      />
     </li>
+    <!-- ...user lainnya -->
   </ul>
 </main>
 ```
 
-Menggunakan custom tag `<app-header>` dan `<app-user>` yang sesuai dengan `selector` di masing-masing component.
+- `[id]`, `[avatar]`, `[name]` — property binding, mengirim data ke `@Input()` di `UserComponent`
+- `(selectUser)` — event binding, mendengarkan `@Output() selectUser` dari `UserComponent`
+- `$event` — nilai yang dikirim via `.emit()`, yaitu id user bertipe `string`
 
 ---
 
@@ -363,10 +484,7 @@ Path `assets/...` merujuk ke folder `src/assets/` yang di-serve langsung oleh An
 ### `user/user.component.ts` — User Component
 
 ```typescript
-import { Component, signal, computed } from '@angular/core';
-import { DUMMY_USERS } from '../dummy-users';
-
-const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 
 @Component({
   selector: 'app-user',
@@ -376,29 +494,32 @@ const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
   styleUrl: './user.component.css'
 })
 export class UserComponent {
-  selectedUser = signal(DUMMY_USERS[randomIndex]);  // signal: state reaktif
+  // @Input — menerima data dari parent (AppComponent)
+  @Input({ required: true }) id!: string;
+  @Input({ required: true }) avatar!: string;
+  @Input({ required: true }) name!: string;
 
-  imagePath = computed(() =>                        // computed: turunan dari selectedUser
-    'assets/users/' + this.selectedUser().avatar
-  );
+  // @Output — mendefinisikan event yang bisa didengar parent
+  // EventEmitter<string> = event ini mengirim nilai bertipe string
+  @Output() selectUser = new EventEmitter<string>();
 
-  onSelectUser() {
-    const randomIndex = Math.floor(Math.random() * DUMMY_USERS.length);
-    this.selectedUser.set(DUMMY_USERS[randomIndex]); // .set() untuk ubah nilai signal
+  get imagePath() {
+    return `assets/users/${this.avatar}`;
+  }
+
+  // Dipanggil saat tombol diklik (lihat template: (click)="handleClick()")
+  // .emit() mengirim this.id ke parent sebagai $event
+  handleClick() {
+    this.selectUser.emit(this.id);
   }
 }
 ```
 
-**Alur reaktivitas:**
-1. User klik tombol → `onSelectUser()` dipanggil
-2. `selectedUser.set(...)` → nilai signal berubah
-3. Angular mendeteksi perubahan → `imagePath` (computed) dihitung ulang otomatis
-4. Template diperbarui: `selectedUser().name` dan `imagePath()` menampilkan data baru
-
-**Tipe data di dalam signal** secara implisit adalah:
-```typescript
-Signal<{ id: string; name: string; avatar: string; }>
-```
+**Alur komunikasi:**
+1. Parent mengirim `id`, `avatar`, `name` via `@Input()`
+2. User klik tombol → `handleClick()` dipanggil
+3. `selectUser.emit(this.id)` → event dikirim ke parent
+4. Parent menerima `$event` (berisi `id`) dan menjalankan `onSelectUser(userId)`
 
 ---
 
@@ -406,23 +527,20 @@ Signal<{ id: string; name: string; avatar: string; }>
 
 ```html
 <div>
-    <button (click)="onSelectUser()">
-        <img [src]="imagePath()" [alt]="selectedUser().name">
-        <span>{{ selectedUser().name }}</span>
+    <!-- (click) = click event binding. Saat tombol diklik, Angular memanggil handleClick(). -->
+    <button (click)="handleClick()">
+        <img [src]="imagePath" [alt]="name">
+        <span>{{ name }}</span>
     </button>
 </div>
 ```
 
-Semua binding di template ini menggunakan **Signal API** — nilai dibaca dengan tanda kurung `()`:
-
 | Ekspresi | Jenis | Penjelasan |
 |---|---|---|
-| `(click)="onSelectUser()"` | Event binding | Memanggil method saat tombol diklik |
-| `[src]="imagePath()"` | Property binding | Membaca nilai computed signal `imagePath` |
-| `[alt]="selectedUser().name"` | Property binding | Membaca property `.name` dari signal `selectedUser` |
-| `{{ selectedUser().name }}` | String interpolation | Menampilkan nama user di dalam `<span>` |
-
-> **Aturan penting saat pakai Signal di template:** Setiap signal atau computed **harus dipanggil dengan `()`** agar Angular bisa melacak dependensinya dan memperbarui tampilan secara reaktif.
+| `(click)="handleClick()"` | Event binding | Memanggil method saat tombol diklik |
+| `[src]="imagePath"` | Property binding | Membaca getter `imagePath` |
+| `[alt]="name"` | Property binding | Membaca `@Input() name` |
+| `{{ name }}` | String interpolation | Menampilkan nama user di dalam `<span>` |
 
 ---
 
@@ -478,6 +596,45 @@ Data mengalir **satu arah**: TypeScript → Template → Browser. Dengan Signal,
 
 ---
 
+## Komunikasi Antar Component
+
+Angular menggunakan pola **satu arah** untuk komunikasi antar component:
+
+```
+Parent (AppComponent)
+    │
+    │  @Input() — kirim data ke bawah (property binding)
+    │  [id], [avatar], [name]
+    ▼
+Child (UserComponent)
+    │
+    │  @Output() + EventEmitter — kirim event ke atas (event binding)
+    │  (selectUser)="onSelectUser($event)"
+    ▼
+Parent (AppComponent)
+```
+
+### Ringkasan Pola
+
+| Arah | Mekanisme | Di Child | Di Template Parent |
+|---|---|---|---|
+| Parent → Child | `@Input()` | `@Input() name!: string` | `[name]="users[0].name"` |
+| Child → Parent | `@Output()` + `EventEmitter` | `@Output() selectUser = new EventEmitter<string>()` | `(selectUser)="onSelectUser($event)"` |
+
+### Kenapa `$event`?
+
+Saat child memanggil `.emit(nilai)`, Angular menangkap nilai itu dan menyimpannya sebagai `$event` di template parent. Nama `$event` adalah **kata kunci khusus Angular** — tidak bisa diganti nama lain di template.
+
+```
+child:  this.selectUser.emit("u1")
+                              ↓
+parent: (selectUser)="onSelectUser($event)"
+                                    ↓
+                           userId = "u1"
+```
+
+---
+
 ## Konsep Penting untuk Dipelajari
 
 Berdasarkan project ini, berikut topik yang bisa kamu eksplorasi lebih lanjut:
@@ -486,20 +643,21 @@ Berdasarkan project ini, berikut topik yang bisa kamu eksplorasi lebih lanjut:
 - [x] Standalone Components
 - [x] String Interpolation `{{ }}`
 - [x] Property Binding `[attr]`
-- [x] Event Binding `(event)`
+- [x] Event Binding `(event)` — termasuk `(click)`
+- [x] `@Input()` — menerima data dari parent component
+- [x] `@Output()` + `EventEmitter` — mengirim event ke parent component
+- [x] `$event` — nilai yang dikirim bersama event
 - [x] Signal — reactive state dengan `signal()`
 - [x] Computed Signal — nilai turunan dengan `computed()`
-- [x] Getter (`get`) sebagai computed property (pendekatan lama, digantikan `computed`)
+- [x] Getter (`get`) sebagai computed property
 - [x] Component Composition (component di dalam component)
 - [x] Import data dari file TypeScript biasa
 
 ### Langkah selanjutnya (belum ada, bisa dicoba):
-- [ ] **Input/Output** — kirim data dari parent ke child (`@Input`) dan sebaliknya (`@Output` + `EventEmitter`)
-- [ ] **Event Binding** — `(click)="handler()"` untuk merespons aksi user
 - [ ] **ngFor** — tampilkan semua user dari `DUMMY_USERS` dengan loop
 - [ ] **ngIf / @if** — tampilkan/sembunyikan elemen berdasarkan kondisi
-- [ ] **Signal** — cara modern Angular 17+ untuk reactive state
 - [ ] **Service & Dependency Injection** — berbagi data antar component
+- [ ] **Two-way binding** — `[(ngModel)]` untuk form input
 
 ---
 
